@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Users, Target, Zap, Heart, Award, Sparkles } from 'lucide-react';
 import PageTransition from '../components/common/PageTransition.jsx';
-import Navbar from '../components/layout/Navbar.jsx';
+import Sidebar from '../components/layout/Sidebar.jsx';
 import Footer from '../components/layout/Footer.jsx';
 
 export default function About({ snowfallEnabled, setSnowfallEnabled }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed] = useState(false);
+  const MARGIN = sidebarCollapsed ? 80 : 260;
   const features = [
     {
       icon: Users,
@@ -46,10 +50,16 @@ export default function About({ snowfallEnabled, setSnowfallEnabled }) {
   ];
 
   return (
-    <PageTransition>
-      <Navbar snowfallEnabled={snowfallEnabled} setSnowfallEnabled={setSnowfallEnabled} />
-      <main>
-        <div className="container" style={{ paddingTop: '120px', paddingBottom: '80px' }}>
+    <>
+      <Sidebar 
+        isMobileOpen={mobileOpen} 
+        onMobileClose={() => setMobileOpen(false)}
+        snowfallEnabled={snowfallEnabled}
+        setSnowfallEnabled={setSnowfallEnabled}
+      />
+      <PageTransition>
+        <main style={{ marginLeft: MARGIN, minWidth: 0 }}>
+        <div className="container" style={{ paddingTop: '80px', paddingBottom: '80px' }}>
             {/* Hero */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -253,5 +263,7 @@ export default function About({ snowfallEnabled, setSnowfallEnabled }) {
         </main>
         <Footer />
       </PageTransition>
-    );
-  }
+      <style>{`@media (max-width: 1023px) { main[style] { margin-left: 0 !important; } }`}</style>
+    </>
+  );
+}

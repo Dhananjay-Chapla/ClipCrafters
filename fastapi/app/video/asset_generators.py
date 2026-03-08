@@ -183,6 +183,14 @@ class ImageGenerationService:
         Build a richer educational image prompt and a robust negative prompt.
         The prompt must stay grounded in the specific concept described.
         """
+        # Ensure we have valid inputs
+        if not prompt or not prompt.strip():
+            raise ValueError("Prompt cannot be empty")
+        
+        # Ensure style_preset is not None
+        if not style_preset:
+            style_preset = "cinematic_educational"
+            
         style_description = ImageGenerationService._get_style_description(style_preset)
         domain_details = ImageGenerationService._detect_domain_details(prompt)
 
@@ -230,6 +238,14 @@ class ImageGenerationService:
         2. If fails, try the other provider as fallback
         3. If both fail, raise detailed error
         """
+        # Validate inputs
+        if not prompt or not prompt.strip():
+            raise ValueError("Prompt cannot be empty for image generation")
+        
+        if not style_preset:
+            style_preset = "cinematic_educational"
+            logger.warning("style_preset was None, defaulting to 'cinematic_educational'")
+        
         logger.info(f"Generating image using provider {provider}...")
         
         # Ensure output directory exists

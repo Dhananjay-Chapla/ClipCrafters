@@ -36,143 +36,37 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const res = await projectService.getAll({ limit: 50 });
-      const fetchedProjects = res.data.data?.projects || res.data.data || [];
+      console.log('API Response:', res.data); // Debug log
       
-      // Add dummy data if no projects exist
+      // Handle different response structures
+      let fetchedProjects = [];
+      
+      if (res.data.data?.projects) {
+        fetchedProjects = res.data.data.projects;
+      } else if (res.data.data) {
+        fetchedProjects = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
+      } else if (res.data.projects) {
+        fetchedProjects = res.data.projects;
+      } else if (Array.isArray(res.data)) {
+        fetchedProjects = res.data;
+      }
+      
+      console.log('Fetched Projects:', fetchedProjects); // Debug log
+      console.log('Projects Count:', fetchedProjects.length); // Debug log
+      
+      // Always set projects, even if empty (don't use dummy data)
+      setProjects(fetchedProjects);
+      
       if (fetchedProjects.length === 0) {
-        const dummyProjects = [
-          {
-            _id: 'dummy-1',
-            title: 'AI Video Marketing Campaign',
-            description: 'Create engaging marketing videos using AI-generated visuals and narration',
-            status: 'completed',
-            createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-            duration: 120,
-            scenes: 8,
-          },
-          {
-            _id: 'dummy-2',
-            title: 'Educational Science Explainer',
-            description: 'Generate educational videos explaining complex scientific concepts',
-            status: 'processing',
-            createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-            duration: 180,
-            scenes: 12,
-          },
-          {
-            _id: 'dummy-3',
-            title: 'Product Demo Video',
-            description: 'Showcase product features with AI-generated visuals and voiceover',
-            status: 'draft',
-            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-            duration: 90,
-            scenes: 6,
-          },
-          {
-            _id: 'dummy-4',
-            title: 'Social Media Content Series',
-            description: 'Generate short-form videos optimized for social media platforms',
-            status: 'completed',
-            createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-            duration: 60,
-            scenes: 4,
-          },
-          {
-            _id: 'dummy-5',
-            title: 'Tutorial Video Series',
-            description: 'Create step-by-step tutorial videos with AI narration',
-            status: 'processing',
-            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-            duration: 240,
-            scenes: 15,
-          },
-          {
-            _id: 'dummy-6',
-            title: 'Brand Story Video',
-            description: 'Tell your brand story with cinematic AI-generated visuals',
-            status: 'draft',
-            createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-            duration: 150,
-            scenes: 10,
-          },
-        ];
-        setProjects(dummyProjects);
-      } else {
-        setProjects(fetchedProjects);
+        toast.info('No projects found. Create your first project!');
       }
     } catch (err) {
-      // On error, show dummy data
-      const dummyProjects = [
-        {
-          _id: 'dummy-1',
-          title: 'AI Video Marketing Campaign',
-          description: 'Create engaging marketing videos using AI-generated visuals and narration',
-          status: 'completed',
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          duration: 120,
-          scenes: 8,
-        },
-        {
-          _id: 'dummy-2',
-          title: 'Educational Science Explainer',
-          description: 'Generate educational videos explaining complex scientific concepts',
-          status: 'processing',
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-          duration: 180,
-          scenes: 12,
-        },
-        {
-          _id: 'dummy-3',
-          title: 'Product Demo Video',
-          description: 'Showcase product features with AI-generated visuals and voiceover',
-          status: 'draft',
-          createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-          duration: 90,
-          scenes: 6,
-        },
-        {
-          _id: 'dummy-4',
-          title: 'Social Media Content Series',
-          description: 'Generate short-form videos optimized for social media platforms',
-          status: 'completed',
-          createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          duration: 60,
-          scenes: 4,
-        },
-        {
-          _id: 'dummy-5',
-          title: 'Tutorial Video Series',
-          description: 'Create step-by-step tutorial videos with AI narration',
-          status: 'processing',
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-          duration: 240,
-          scenes: 15,
-        },
-        {
-          _id: 'dummy-6',
-          title: 'Brand Story Video',
-          description: 'Tell your brand story with cinematic AI-generated visuals',
-          status: 'draft',
-          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-          duration: 150,
-          scenes: 10,
-        },
-      ];
-      setProjects(dummyProjects);
+      console.error('Fetch Projects Error:', err); // Debug log
       toast.error(err.response?.data?.message || 'Failed to load projects');
-    } finally { setLoading(false); }
+      setProjects([]); // Set empty array on error
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleDelete = async (id) => {

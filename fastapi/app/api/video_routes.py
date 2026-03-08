@@ -147,11 +147,22 @@ async def generate_scene_image(project_id: str, scene_id: str, request: AssetGen
             
         logger.info(f"Starting image generation for scene {scene_id} with provider {request.image_provider or 'default'}")
         
+        # Ensure we have a valid prompt
+        final_prompt = scene.enriched_prompt or scene.visual_prompt
+        if not final_prompt:
+            raise ValueError("No prompt available for image generation. Please ensure the scene has a visual_prompt or enriched_prompt.")
+        
+        # Ensure we have a valid style preset (default to cinematic_educational if None)
+        final_style_preset = scene.style_preset or request.image_style or "cinematic_educational"
+        
+        # Ensure we have a valid negative prompt (can be None, will use default in service)
+        final_negative_prompt = scene.negative_prompt
+        
         await ImageGenerationService.generate_image(
-            prompt=scene.enriched_prompt or scene.visual_prompt,
+            prompt=final_prompt,
             output_path=image_path,
-            style_preset=scene.style_preset,
-            negative_prompt=scene.negative_prompt,
+            style_preset=final_style_preset,
+            negative_prompt=final_negative_prompt,
             provider=request.image_provider or scene.image_provider or ImageProvider.GEMINI.value
         )
         
@@ -335,10 +346,14 @@ async def _process_all_scenes_bg(project_id: str, req: AssetGenerationRequest):
                     scene.negative_prompt = visual_plan.negative_prompt
                     scene.style_preset = req.image_style
                 
+                # Ensure we have valid values for image generation
+                final_prompt = scene.enriched_prompt or scene.visual_prompt
+                final_style_preset = scene.style_preset or req.image_style or "cinematic_educational"
+                
                 await ImageGenerationService.generate_image(
-                    prompt=scene.enriched_prompt or scene.visual_prompt, 
+                    prompt=final_prompt, 
                     output_path=img_path, 
-                    style_preset=scene.style_preset,
+                    style_preset=final_style_preset,
                     negative_prompt=scene.negative_prompt,
                     provider=req.image_provider or scene.image_provider or ImageProvider.STABILITY.value
                 )
