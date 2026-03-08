@@ -48,6 +48,7 @@ from app.utils.helpers import (
     get_file_extension,
     validate_file_extension,
 )
+from app.utils.fallback_script import generate_fallback_script
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -115,6 +116,56 @@ def _get_generator() -> ScriptGenerator:
 async def health_check():
     """Simple health check."""
     return HealthResponse()
+
+
+@router.get("/fallback-script", response_model=ScriptResponse, tags=["Demo"])
+async def get_fallback_script():
+    """
+    Get a fallback/demo script about Artificial Intelligence and Human Psychology.
+    This can be used for testing, demos, or as a fallback when script generation fails.
+    """
+    return generate_fallback_script(document_id="demo_fallback")
+
+
+@router.get("/dummy-transcript", tags=["Demo"])
+async def get_dummy_transcript():
+    """
+    Get the raw dummy transcript text.
+    This is the constant transcript used throughout the system as a fallback.
+    """
+    from app.utils.fallback_script import get_dummy_transcript
+    return {
+        "transcript": get_dummy_transcript(),
+        "scene_count": 7,
+        "topic": "Artificial Intelligence and Human Psychology"
+    }
+
+
+@router.post("/generate-fallback-script/{document_id}", response_model=ScriptResponse, tags=["Pipeline"])
+async def generate_fallback_for_document(document_id: str):
+    """
+    Generate and save a fallback script for a specific document.
+    Useful when the actual script generation fails.
+    """
+    doc = _get_doc(document_id)
+    
+    try:
+        # Generate fallback script
+        script = generate_fallback_script(document_id=document_id)
+        
+        # Save it
+        _save_script(document_id, script)
+        
+        # Update document status
+        doc["status"] = DocumentStatusEnum.GENERATED
+        doc["updated_at"] = datetime.utcnow()
+        
+        logger.info(f"Fallback script generated and saved for {document_id}")
+        return script
+        
+    except Exception as exc:
+        logger.error(f"Failed to generate fallback script for {document_id}: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # ────────────────────────── Upload ────────────────────────────────
@@ -259,8 +310,19 @@ async def build_index(document_id: str):
     response_model=ScriptResponse,
     tags=["Pipeline"],
 )
-async def generate_script(document_id: str, request: ScriptRequest = ScriptRequest()):
-    """Retrieve relevant chunks and generate a video script via Groq LLM."""
+async def generate_script(
+    document_id: str, 
+    request: ScriptRequest = ScriptRequest(),
+    use_fallback_on_error: bool = False
+):
+    """
+    Retrieve relevant chunks and generate a video script via Groq LLM.
+    
+    Args:
+        document_id: The document to generate script for
+        request: Script generation parameters
+        use_fallback_on_error: If True, automatically use fallback script on generation failure
+    """
 
     doc = _get_doc(document_id)
 
@@ -307,6 +369,21 @@ async def generate_script(document_id: str, request: ScriptRequest = ScriptReque
         doc["error"] = str(exc)
         doc["updated_at"] = datetime.utcnow()
         logger.error("Script generation failed for %s: %s", document_id, exc)
+        
+        # If use_fallback_on_error is True, generate and return fallback script
+        if use_fallback_on_error:
+            logger.info("Generating fallback script for %s due to error", document_id)
+            try:
+                fallback_script = generate_fallback_script(document_id=document_id)
+                _save_script(document_id, fallback_script)
+                doc["status"] = DocumentStatusEnum.GENERATED
+                doc["updated_at"] = datetime.utcnow()
+                logger.info("Fallback script generated and saved for %s", document_id)
+                return fallback_script
+            except Exception as fallback_exc:
+                logger.error("Fallback script generation also failed for %s: %s", document_id, fallback_exc)
+                raise HTTPException(status_code=500, detail=f"Script generation failed: {str(exc)}. Fallback also failed: {str(fallback_exc)}")
+        
         raise HTTPException(status_code=500, detail=str(exc))
 
 

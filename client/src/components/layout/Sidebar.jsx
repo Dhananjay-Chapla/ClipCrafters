@@ -9,8 +9,7 @@ import SnowfallToggle from '../ui/SnowfallToggle.jsx';
 
 const NAV = [
   { label: 'Dashboard', icon: BarChart3, route: '/dashboard' },
-   { label: 'Projects', icon: FolderOpen, route: '/projects/create', exact: false },
-  // { label: 'Create New', icon: PlusCircle, route: '/projects/create', highlighted: true },
+  { label: 'Projects', icon: FolderOpen, route: '/projects/create', exact: false },
   { label: 'RAG Generator', icon: Sparkles, route: '/rag-generator' },
   { label: 'Video Editor', icon: Film, route: '/video-editor' },
   { label: 'About Us', icon: Info, route: '/about' },
@@ -176,6 +175,8 @@ function SidebarContent({ mobile, collapsed, location, user, onMobileClose, onLo
               gap: 12, 
               padding: '12px', 
               borderRadius: 12,
+              background: 'var(--primary-subtle)',
+              border: '1px solid var(--border-active)',
             }}
           >
             <div 
@@ -195,19 +196,19 @@ function SidebarContent({ mobile, collapsed, location, user, onMobileClose, onLo
                 boxShadow: '0 0 20px var(--primary-glow)',
               }}
             >
-              {getInitials(user.name || 'U')}
+              {getInitials(user?.name || 'U')}
             </div>
-            <div style={{ overflow: 'hidden', flex: 1 }}>
+            <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
               <div style={{ 
                 fontWeight: 600, 
-                fontSize: '0.85rem', 
+                fontSize: '0.9rem', 
                 color: 'var(--text-primary)', 
                 overflow: 'hidden', 
                 textOverflow: 'ellipsis', 
                 whiteSpace: 'nowrap',
                 textShadow: '0 2px 4px rgba(0,0,0,0.3)',
               }}>
-                {user.name}
+                {user?.name || 'User'}
               </div>
               <div style={{ 
                 fontSize: '0.75rem', 
@@ -217,7 +218,7 @@ function SidebarContent({ mobile, collapsed, location, user, onMobileClose, onLo
                 whiteSpace: 'nowrap',
                 fontWeight: 500,
               }}>
-                {user.role}
+                {user?.role || 'Member'}
               </div>
             </div>
           </div>
@@ -239,10 +240,12 @@ function SidebarContent({ mobile, collapsed, location, user, onMobileClose, onLo
               color: 'white',
               boxShadow: '0 0 20px var(--primary-glow)',
               margin: '0 auto',
+              cursor: 'pointer',
+              position: 'relative',
             }}
-            title={user.name}
+            title={`${user?.name || 'User'} (${user?.role || 'Member'})`}
           >
-            {getInitials(user.name || 'U')}
+            {getInitials(user?.name || 'U')}
           </div>
         )}
 
@@ -306,7 +309,7 @@ export default function Sidebar({ isMobileOpen, onMobileClose, snowfallEnabled, 
           snowfallEnabled={snowfallEnabled}
           setSnowfallEnabled={setSnowfallEnabled}
         />
-        {/* Collapse toggle - moved to top */}
+        {/* Collapse toggle - fully visible */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           data-cursor="pointer"
@@ -314,7 +317,7 @@ export default function Sidebar({ isMobileOpen, onMobileClose, snowfallEnabled, 
           style={{
             position: 'absolute', 
             top: 80,
-            right: -16,
+            right: -14,
             width: 32, 
             height: 32, 
             borderRadius: '50%',
@@ -325,10 +328,19 @@ export default function Sidebar({ isMobileOpen, onMobileClose, snowfallEnabled, 
             alignItems: 'center', 
             justifyContent: 'center',
             color: 'var(--primary)', 
-            zIndex: 10,
+            zIndex: 100,
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = '0 0 12px var(--primary-glow)';
+            e.currentTarget.style.transform = 'scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+            e.currentTarget.style.transform = 'scale(1)';
           }}
         >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
       </motion.aside>
 

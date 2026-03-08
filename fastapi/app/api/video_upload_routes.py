@@ -32,53 +32,86 @@ router = APIRouter(prefix="/video-upload", tags=["Video Upload & Processing"])
 def check_ffmpeg_available() -> tuple[bool, str]:
     """Check if FFmpeg is installed and available."""
     try:
-        # Use configured path, local installation, or system PATH
-        ffmpeg_cmd = settings.ffmpeg_executable
+        from pathlib import Path
         
-        result = subprocess.run(
-            [ffmpeg_cmd, "-version"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode == 0:
-            version_line = result.stdout.split('\n')[0] if result.stdout else "Unknown version"
-            location = "local installation" if "ffmpeg/bin" in ffmpeg_cmd else "system PATH" if ffmpeg_cmd == "ffmpeg" else "configured path"
-            return True, f"FFmpeg is available ({location}): {version_line}"
-        return False, "FFmpeg command failed"
-    except FileNotFoundError:
+        # Try multiple paths in order of preference
+        ffmpeg_paths = [
+            # 1. Configured path from .env
+            settings.ffmpeg_executable,
+            # 2. Local installation (absolute path)
+            str(settings.local_ffmpeg_path / "ffmpeg.exe"),
+            # 3. System PATH
+            "ffmpeg"
+        ]
+        
+        for ffmpeg_cmd in ffmpeg_paths:
+            try:
+                result = subprocess.run(
+                    [ffmpeg_cmd, "-version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    version_line = result.stdout.split('\n')[0] if result.stdout else "Unknown version"
+                    logger.info(f"FFmpeg found at: {ffmpeg_cmd}")
+                    return True, f"FFmpeg is available: {version_line}"
+            except (FileNotFoundError, OSError):
+                continue
+        
+        # If we get here, FFmpeg was not found
         return False, (
-            "FFmpeg not found. Please run: python download_ffmpeg.py\n"
-            "This will download FFmpeg to fastapi/ffmpeg/ folder.\n"
-            "Alternatively:\n"
-            "1. Download from: https://www.gyan.dev/ffmpeg/builds/ (use 'full' build)\n"
-            "2. Extract to fastapi/ffmpeg/\n"
-            "3. Restart the server"
+            "FFmpeg not found at any of the expected locations:\n"
+            f"  - {ffmpeg_paths[0]}\n"
+            f"  - {ffmpeg_paths[1]}\n"
+            f"  - {ffmpeg_paths[2]}\n"
+            "Please ensure FFmpeg is installed at fastapi/ffmpeg-8.0.1-essentials_build/bin/"
         )
     except Exception as e:
+        logger.error(f"FFmpeg check failed with exception: {str(e)}", exc_info=True)
         return False, f"FFmpeg check failed: {str(e)}"
 
 
 def check_ffprobe_available() -> tuple[bool, str]:
     """Check if FFprobe is installed and available."""
     try:
-        # Use configured path, local installation, or system PATH
-        ffprobe_cmd = settings.ffprobe_executable
+        from pathlib import Path
         
-        result = subprocess.run(
-            [ffprobe_cmd, "-version"],
-            capture_output=True,
-            text=True,
-            timeout=5
+        # Try multiple paths in order of preference
+        ffprobe_paths = [
+            # 1. Configured path from .env
+            settings.ffprobe_executable,
+            # 2. Local installation (absolute path)
+            str(settings.local_ffmpeg_path / "ffprobe.exe"),
+            # 3. System PATH
+            "ffprobe"
+        ]
+        
+        for ffprobe_cmd in ffprobe_paths:
+            try:
+                result = subprocess.run(
+                    [ffprobe_cmd, "-version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    version_line = result.stdout.split('\n')[0] if result.stdout else "Unknown version"
+                    logger.info(f"FFprobe found at: {ffprobe_cmd}")
+                    return True, f"FFprobe is available: {version_line}"
+            except (FileNotFoundError, OSError):
+                continue
+        
+        # If we get here, FFprobe was not found
+        return False, (
+            "FFprobe not found at any of the expected locations:\n"
+            f"  - {ffprobe_paths[0]}\n"
+            f"  - {ffprobe_paths[1]}\n"
+            f"  - {ffprobe_paths[2]}\n"
+            "Please ensure FFprobe is installed at fastapi/ffmpeg-8.0.1-essentials_build/bin/"
         )
-        if result.returncode == 0:
-            version_line = result.stdout.split('\n')[0] if result.stdout else "Unknown version"
-            location = "local installation" if "ffmpeg/bin" in ffprobe_cmd else "system PATH" if ffprobe_cmd == "ffprobe" else "configured path"
-            return True, f"FFprobe is available ({location}): {version_line}"
-        return False, "FFprobe command failed"
-    except FileNotFoundError:
-        return False, "FFprobe not found. Run: python download_ffmpeg.py"
     except Exception as e:
+        logger.error(f"FFprobe check failed with exception: {str(e)}", exc_info=True)
         return False, f"FFprobe check failed: {str(e)}"
 
 

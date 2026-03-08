@@ -25,8 +25,11 @@ VISUAL_PLANNER_PROMPT = """You are an expert educational visual designer and sci
 
 Your task is to convert scene narration into a high-quality image generation prompt that creates a visually explanatory educational image.
 
-GOAL
-The generated image must help the viewer understand the concept being narrated. Do not generate generic decorative art prompts. Generate prompts that explain the idea visually.
+CRITICAL RULE
+The generated image MUST directly illustrate the specific concept described in the narration.
+Do NOT generate generic decorative art prompts.
+Do NOT produce irrelevant images (e.g., a random landscape when the narration is about photosynthesis).
+Every element in the prompt MUST be traceable to something mentioned in the narration.
 
 INPUT
 Scene Heading: {heading}
@@ -34,25 +37,26 @@ Scene Narration: {narration}
 Preferred Style Preset: {style_preset}
 
 YOUR JOB
-Analyze the narration and produce:
-1. concept_summary
-2. visual_type
-3. enriched_image_prompt
-4. negative_prompt
-5. optional_labels
-6. optional_composition_notes
+Carefully read the narration. Identify the EXACT subject, concept, process, or structure being described.
+Then produce:
+1. concept_summary — A 1-sentence summary of what the narration explains.
+2. visual_type — e.g., "process diagram", "cross-section", "comparison chart", "labeled illustration".
+3. enriched_image_prompt — A DETAILED prompt that will generate an image showing EXACTLY what the narration describes. This prompt MUST mention specific objects, structures, processes, or concepts from the narration. It must NOT be a generic prompt.
+4. negative_prompt — Terms to avoid in generation.
+5. optional_labels — Labels that should appear in the image.
+6. optional_composition_notes — How to compose the image.
 
 RULES
-1. Focus on educational clarity first.
-2. If the narration describes a process, show the process visually.
-3. If the narration describes a structure, show the structure clearly.
-4. Include relationships, arrows, flows, inputs, outputs, and labeled parts when useful.
-5. Avoid vague prompts like "beautiful biology art" or "animation of chloroplast".
-6. Use style only as enhancement. Never let style remove scientific clarity.
-7. Keep prompts detailed, concrete, and scene-specific.
-8. Prefer visuals that a student can understand quickly.
-9. Avoid generic backgrounds unless they help explain the concept.
-10. If the narration is abstract, convert it into a visually teachable composition.
+1. READ the narration carefully. Identify the specific subject (e.g., "chloroplast structure", "neural network layers", "water cycle", "supply chain management").
+2. The enriched_image_prompt MUST include specific nouns and concepts from the narration — if the narration mentions "mitochondria" then the prompt must mention "mitochondria", not just "biology".
+3. If the narration describes a process (how X works), show the process visually with arrows and steps.
+4. If the narration describes a structure, show the structure with labeled parts.
+5. If the narration makes a comparison, use split-screen or side-by-side composition.
+6. Include relationships, arrows, flows, inputs, outputs, and labeled parts when useful.
+7. NEVER produce vague prompts like "educational graphic", "beautiful illustration", "cinematic scene", or "animated introduction".
+8. Use style only as enhancement. Never let style remove scientific clarity.
+9. If the narration is abstract (e.g., about ethics, philosophy), create a concrete visual metaphor that teaches the concept.
+10. Aim for visual clarity that a student can understand at a glance.
 
 STYLE PRESET GUIDELINES
 - ghibli_educational: warm, storybook-like, hand-painted feel, expressive but still clear and educational
@@ -64,7 +68,7 @@ STYLE PRESET GUIDELINES
 
 NEGATIVE PROMPT RULES
 Include terms that reduce bad outputs such as:
-- blurry, low detail, distorted anatomy, extra limbs, irrelevant objects, clutter, unreadable text, generic wallpaper, low educational value, messy composition
+- blurry, low detail, distorted anatomy, extra limbs, irrelevant objects, clutter, unreadable text, generic wallpaper, low educational value, messy composition, unrelated subject matter
 
 OUTPUT FORMAT
 Return strict JSON in this format:
@@ -84,22 +88,27 @@ Return strict JSON in this format:
 """
 
 REWRITE_PROMPT_TEMPLATE = """You are an expert educational visual designer and scientific storyboard prompt writer for an AI video generation system.
-Your task is to convert narration into a visual prompt that clearly explains the concept.
+Your task is to rewrite a vague image prompt into a highly specific, narration-grounded image generation prompt.
+
+CRITICAL: The rewritten prompt MUST directly illustrate the specific concept described in the narration below.
+Do NOT return a generic prompt. Every visual element must be traceable to the narration.
 
 RULES:
-- show the mechanism or process visually
-- include important entities
-- include arrows showing relationships if needed
-- show inputs and outputs if relevant
-- use composition that teaches the concept
-- avoid generic words (educational graphic, nice illustration, background)
-- prefer scientific diagrams or educational illustrations
-- ensure visual clarity, style must support learning
+- READ the narration carefully and identify the EXACT subject/concept
+- The prompt must mention specific nouns and concepts from the narration
+- Show the mechanism or process visually if the narration describes one
+- Include important entities mentioned in the narration
+- Include arrows showing relationships if needed
+- Show inputs and outputs if relevant
+- Use composition that teaches the concept
+- NEVER use generic phrases: "educational graphic", "nice illustration", "cinematic scene", "animated background"
+- Prefer scientific diagrams, educational illustrations, or concept explanations
+- Ensure visual clarity — style must support learning
 
 Original Vague Prompt: {prompt}
 Scene Narration: {narration}
 
-Return ONLY the rewritten prompt string, nothing else.
+Return ONLY the rewritten prompt string. The prompt must reference specific concepts from the narration.
 """
 
 class VisualPlannerService:
@@ -123,15 +132,34 @@ class VisualPlannerService:
     @staticmethod
     def validate_visual_prompt(prompt: str) -> bool:
         """Returns True if the prompt is valid and highly detailed, False if it's too vague/generic."""
-        if not prompt or len(prompt.split()) < 8:
+        if not prompt or len(prompt.split()) < 15:  # Increased minimum word count
+            logger.warning(f"Prompt too short ({len(prompt.split())} words): {prompt[:50]}")
             return False
             
+        # Expanded list of banned generic phrases
         banned_phrases = [
             "educational graphic", "animation of", "nice illustration", 
-            "background", "concept art", "simple diagram"
+            "background", "concept art", "simple diagram", "generic",
+            "placeholder", "decorative", "abstract art", "wallpaper",
+            "beautiful scene", "captivating", "animated introduction",
+            "end card", "summary graphic", "bullet point", "infographic about",
+            "visual representation", "image showing", "picture of"
         ]
         prompt_lower = prompt.lower()
         if any(phrase in prompt_lower for phrase in banned_phrases):
+            logger.warning(f"Prompt contains banned phrase: {prompt[:50]}")
+            return False
+        
+        # Require specific nouns/concepts (check for meaningful content words)
+        # A good prompt should have multiple specific nouns
+        words = prompt.split()
+        # Filter out common words and check for specific terminology
+        meaningful_words = [w for w in words if len(w) > 4 and w.lower() not in 
+                          ['about', 'shows', 'image', 'scene', 'visual', 'illustration', 
+                           'diagram', 'showing', 'depicting', 'represents']]
+        
+        if len(meaningful_words) < 8:  # Require at least 8 meaningful content words
+            logger.warning(f"Prompt lacks specific terminology ({len(meaningful_words)} meaningful words): {prompt[:50]}")
             return False
             
         return True
@@ -197,16 +225,25 @@ class VisualPlannerService:
             
         except Exception as e:
             logger.error(f"Failed to generate enriched visual plan: {e}")
-            # Improved Fallback: Use narration as context for the prompt
-            fallback_prompt = f"Educational visualization of: {scene.narration_text[:100]}..."
-            if scene.visual_prompt and len(scene.visual_prompt) > 10:
+            # Improved Fallback: Always use narration content to build a descriptive prompt
+            # Extract first 200 chars of narration for context
+            narration_snippet = scene.narration_text[:200].strip()
+            fallback_prompt = (
+                f"Educational illustration for a scene titled '{scene.heading}'. "
+                f"The narration explains: {narration_snippet}. "
+                f"Create a clear, detailed visual that directly illustrates these concepts. "
+                f"Show specific objects, structures, or processes mentioned in the narration."
+            )
+            
+            # Use scene.visual_prompt only if it's already narration-based (not generic)
+            if scene.visual_prompt and len(scene.visual_prompt) > 50 and "narration discusses" in scene.visual_prompt.lower():
                 fallback_prompt = scene.visual_prompt
 
             return VisualConceptResponse(
-                concept_summary="Fallback Generation",
-                visual_type="Generic Educational",
+                concept_summary=f"Fallback: {scene.heading}",
+                visual_type="Narration-based Educational",
                 enriched_image_prompt=fallback_prompt,
-                negative_prompt="blurry, distorted, unrelated, text-heavy",
+                negative_prompt="blurry, distorted, unrelated subject matter, generic wallpaper, text-heavy, irrelevant objects",
                 optional_labels=[],
-                optional_composition_notes="Automatically generated fallback prompt"
+                optional_composition_notes="Fallback prompt derived from scene narration content"
             )

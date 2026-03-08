@@ -1,3 +1,33 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Build output
+dist
+dist-ssr
+build
+*.local
+out
+.next
+.nuxt
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+!.env.example
+!.env.sample
+
 # Logs
 logs
 *.log
@@ -7,29 +37,21 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Dependencies
-node_modules
-.pnp
-.pnp.js
-
-# Build output
-dist
-dist-ssr
-build
-*.local
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Testing
+coverage
+.nyc_output
+.coverage
+htmlcov/
+test-results/
+playwright-report/
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
@@ -37,19 +59,73 @@ build
 *.sw?
 *.swp
 *.swo
+*~
 
 # OS files
-Thumbs.db
 .DS_Store
-
-# Testing
-coverage
-.nyc_output
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
 
 # Temporary files
 *.tmp
 *.temp
 .cache
+.parcel-cache
 
 # Debug
 .vscode/launch.json
+
+# TypeScript
+*.tsbuildinfo
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Storybook
+storybook-static
+
+# Sentry
+.sentryclirc
+
+# Vercel
+.vercel
+
+# Turbo
+.turbo
+
+# Local development
+.local
+
+# PWA
+sw.js
+sw.js.map
+workbox-*.js
+workbox-*.js.map
+
+# Generated files
+generated/
+auto-generated/
+
+# Backup files
+*.bak
+*.backup
+
+# Lock files (optional - uncomment if you want to ignore them)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

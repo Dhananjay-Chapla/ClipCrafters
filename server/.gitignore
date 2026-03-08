@@ -1,51 +1,165 @@
 # ── Dependencies ──────────────────────────
 node_modules/
+.pnp
+.pnp.js
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
 
 # ── Environment ───────────────────────────
 .env
 .env.local
 .env.development
+.env.development.local
+.env.test
+.env.test.local
 .env.production
+.env.production.local
+.env.*
 !.env.example
+!.env.sample
 
 # ── Logs ──────────────────────────────────
 *.log
 logs/
 npm-debug.log*
 yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 # ── Uploads / temp files ──────────────────
-uploads/
+uploads/*
+!uploads/.gitkeep
 tmp/
 temp/
 *.tmp
+*.temp
 
 # ── Build ─────────────────────────────────
 dist/
 build/
+out/
 
 # ── Certificates / secrets ────────────────
 *.pem
 *.key
 *.cert
+*.crt
 *.p12
 *.pfx
+secrets/
+credentials/
+
+# ── Database ──────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
 
 # ── OS ────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
-desktop.ini
+Desktop.ini
+*~
 
 # ── IDE ───────────────────────────────────
 .idea/
 *.swp
 *.swo
-.vscode/settings.json
+*.swn
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
 
 # ── Test coverage ─────────────────────────
 coverage/
 .nyc_output/
+test-results/
+.coverage
+
+# ── Testing ───────────────────────────────
+*.test.js.snap
+__snapshots__/
+
+# ── Cache ─────────────────────────────────
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# ── Optional npm cache ────────────────────
+.npm
+
+# ── TypeScript ────────────────────────────
+*.tsbuildinfo
+
+# ── Backup files ──────────────────────────
+*.bak
+*.backup
+
+# ── Large files ───────────────────────────
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.flv
+*.wmv
+*.webm
+*.m4v
+*.mpg
+*.mpeg
+*.3gp
+*.wav
+*.mp3
+*.flac
+*.aac
+*.ogg
+*.wma
+*.m4a
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Except sample/demo files
+!samples/**/*.mp4
+!samples/**/*.mp3
+!demos/**/*.mp4
+!demos/**/*.mp3
 
 # ── PowerShell test scripts ───────────────
 test-*.ps1
 *.ps1
+!setup.ps1
+!install.ps1
+
+# ── Session files ─────────────────────────
+sessions/
+*.session
+
+# ── PM2 ───────────────────────────────────
+.pm2/
+pm2.config.js
+ecosystem.config.js
+
+# ── Docker ────────────────────────────────
+.dockerignore
+docker-compose.override.yml
+
+# ── Misc ──────────────────────────────────
+.lock-wscript
+.node_repl_history
+*.tgz
+.yarn-integrity
+

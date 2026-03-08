@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 
 from app.api.routes import _get_doc, _load_script
 from app.models.schemas import ScriptResponse
-from app.models.video_schemas import SceneResponse, ProjectMetadata, AssetGenerationRequest, SceneStatus, AssetStatus
+from app.models.video_schemas import SceneResponse, ProjectMetadata, AssetGenerationRequest, SceneStatus, AssetStatus, SceneValidationResult
 from app.video.scene_segmentation import segmenter
 from app.video.project_manager import ProjectMetadataManager, TimelineService
 from app.video.asset_generators import AudioGenerationService, ImageGenerationService, ImageProvider
@@ -130,6 +130,9 @@ async def generate_scene_image(project_id: str, scene_id: str, request: AssetGen
     image_path = os.path.join(proj_dir, "images", f"{scene_id}.jpg")
     
     try:
+        # Ensure images directory exists
+        os.makedirs(os.path.dirname(image_path), exist_ok=True)
+        
         # User explicitly wants a custom prompt
         if request.custom_prompt:
             scene.enriched_prompt = request.custom_prompt
@@ -142,22 +145,35 @@ async def generate_scene_image(project_id: str, scene_id: str, request: AssetGen
             scene.negative_prompt = visual_plan.negative_prompt
             scene.style_preset = request.image_style
             
+        logger.info(f"Starting image generation for scene {scene_id} with provider {request.image_provider or 'default'}")
+        
         await ImageGenerationService.generate_image(
             prompt=scene.enriched_prompt or scene.visual_prompt,
             output_path=image_path,
             style_preset=scene.style_preset,
             negative_prompt=scene.negative_prompt,
-            provider=request.image_provider or scene.image_provider or ImageProvider.STABILITY.value
+            provider=request.image_provider or scene.image_provider or ImageProvider.GEMINI.value
         )
+        
+        if not os.path.exists(image_path):
+            raise RuntimeError(f"Image file was not created at {image_path}")
         
         scene.image_path = image_path
         scene.image_status = AssetStatus.READY
         scene.clip_status = AssetStatus.MISSING  # Mark clip as needing rebuild
         scene.status = SceneStatus.PROCESSING
+        logger.info(f"Image generation successful for scene {scene_id}")
+        
     except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Image generation failed for scene {scene_id}: {error_msg}", exc_info=True)
         scene.image_status = AssetStatus.ERROR
-        scene.error_message = str(e)
-        raise HTTPException(status_code=500, detail=str(e))
+        scene.error_message = f"Image generation failed: {error_msg}"
+        _update_scene(project_id, scene_id, scene)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Image generation failed: {error_msg}. Please try again or use a different image provider."
+        )
     finally:
         _update_scene(project_id, scene_id, scene)
         
@@ -540,3 +556,153 @@ async def get_project_video(project_id: str):
     if not metadata or not metadata.final_video_path:
         raise HTTPException(status_code=404, detail="Final video not yet rendered.")
     return FileResponse(metadata.final_video_path, media_type="video/mp4")
+
+
+# ── Scene Validation Endpoints ─────────────────────────────────────────────
+
+@router.get("/scenes/{scene_id}/validate", response_model=SceneValidationResult)
+async def validate_scene(project_id: str, scene_id: str):
+    """
+    Validate that a scene has all required assets and that they are properly aligned.
+    Checks:
+    - Script/narration exists and is meaningful
+    - Image prompt exists and is specific (not generic)
+    - Audio file exists
+    - Image file exists
+    - All assets are aligned with each other
+    """
+    scene = _get_scene(project_id, scene_id)
+    
+    issues = []
+    warnings = []
+    
+    # Check script/narration
+    has_script = bool(scene.narration_text and scene.narration_text.strip())
+    if not has_script:
+        issues.append("Missing narration text")
+    elif len(scene.narration_text.split()) < 10:
+        warnings.append("Narration is very short (less than 10 words)")
+    
+    # Check image prompt quality
+    has_image_prompt = bool(scene.enriched_prompt or scene.visual_prompt)
+    prompt_to_check = scene.enriched_prompt or scene.visual_prompt or ""
+    
+    prompt_quality_score = 0.0
+    if has_image_prompt:
+        # Score based on length, specificity, and content
+        words = prompt_to_check.split()
+        word_count = len(words)
+        
+        # Length score (0-0.3)
+        length_score = min(word_count / 50, 1.0) * 0.3
+        
+        # Specificity score (0-0.4) - check for specific nouns and concepts
+        generic_phrases = [
+            "educational graphic", "nice illustration", "background",
+            "concept art", "simple diagram", "generic", "placeholder",
+            "visual representation", "image showing"
+        ]
+        has_generic = any(phrase in prompt_to_check.lower() for phrase in generic_phrases)
+        specificity_score = 0.0 if has_generic else 0.4
+        
+        # Content richness score (0-0.3) - check for meaningful words
+        meaningful_words = [w for w in words if len(w) > 4 and w.lower() not in 
+                          ['about', 'shows', 'image', 'scene', 'visual', 'illustration']]
+        content_score = min(len(meaningful_words) / 15, 1.0) * 0.3
+        
+        prompt_quality_score = length_score + specificity_score + content_score
+        
+        if prompt_quality_score < 0.5:
+            warnings.append(f"Image prompt may be too generic or vague (quality score: {prompt_quality_score:.2f})")
+        if has_generic:
+            warnings.append("Image prompt contains generic phrases that may produce irrelevant images")
+    else:
+        issues.append("Missing image prompt")
+    
+    # Check audio
+    has_audio = bool(scene.audio_path and os.path.exists(scene.audio_path))
+    if not has_audio:
+        if scene.audio_status == AssetStatus.ERROR:
+            issues.append(f"Audio generation failed: {scene.error_message or 'Unknown error'}")
+        elif scene.audio_status == AssetStatus.MISSING:
+            warnings.append("Audio not yet generated")
+        elif scene.audio_status == AssetStatus.GENERATING:
+            warnings.append("Audio generation in progress")
+    
+    # Check image
+    has_image = bool(scene.image_path and os.path.exists(scene.image_path))
+    if not has_image:
+        if scene.image_status == AssetStatus.ERROR:
+            issues.append(f"Image generation failed: {scene.error_message or 'Unknown error'}")
+        elif scene.image_status == AssetStatus.MISSING:
+            warnings.append("Image not yet generated")
+        elif scene.image_status == AssetStatus.GENERATING:
+            warnings.append("Image generation in progress")
+    
+    # Check alignment between narration and prompt
+    if has_script and has_image_prompt:
+        # Extract key concepts from narration
+        narration_words = set(w.lower() for w in scene.narration_text.split() if len(w) > 4)
+        prompt_words = set(w.lower() for w in prompt_to_check.split() if len(w) > 4)
+        
+        # Check for overlap
+        common_words = narration_words.intersection(prompt_words)
+        if len(common_words) < 3:
+            warnings.append(
+                "Image prompt may not be well-aligned with narration "
+                "(few common concepts found)"
+            )
+    
+    is_valid = len(issues) == 0 and has_script and has_image_prompt
+    
+    return SceneValidationResult(
+        scene_id=scene_id,
+        is_valid=is_valid,
+        has_script=has_script,
+        has_image_prompt=has_image_prompt,
+        has_audio=has_audio,
+        has_image=has_image,
+        prompt_quality_score=prompt_quality_score,
+        issues=issues,
+        warnings=warnings
+    )
+
+
+@router.get("/projects/{project_id}/validate-all")
+async def validate_all_scenes(project_id: str):
+    """
+    Validate all scenes in a project.
+    Returns summary statistics and list of scenes with issues.
+    """
+    metadata = _get_project_metadata(project_id)
+    
+    results = []
+    for scene in metadata.scenes:
+        validation = await validate_scene(project_id, scene.scene_id)
+        results.append(validation)
+    
+    total_scenes = len(results)
+    valid_scenes = sum(1 for r in results if r.is_valid)
+    scenes_with_issues = [r for r in results if r.issues]
+    scenes_with_warnings = [r for r in results if r.warnings]
+    
+    avg_prompt_quality = sum(r.prompt_quality_score for r in results) / total_scenes if total_scenes > 0 else 0
+    
+    return {
+        "project_id": project_id,
+        "total_scenes": total_scenes,
+        "valid_scenes": valid_scenes,
+        "invalid_scenes": total_scenes - valid_scenes,
+        "scenes_with_issues": len(scenes_with_issues),
+        "scenes_with_warnings": len(scenes_with_warnings),
+        "average_prompt_quality": round(avg_prompt_quality, 2),
+        "validation_results": results,
+        "summary": {
+            "all_valid": valid_scenes == total_scenes,
+            "ready_for_generation": valid_scenes == total_scenes and avg_prompt_quality >= 0.6,
+            "recommendation": (
+                "All scenes are valid and ready for generation" if valid_scenes == total_scenes and avg_prompt_quality >= 0.6
+                else f"Review {len(scenes_with_issues)} scenes with issues and {len(scenes_with_warnings)} scenes with warnings before generation"
+            )
+        }
+    }

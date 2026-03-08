@@ -1,8 +1,5 @@
 import os
-import aiohttp
 import httpx
-import urllib.parse
-import asyncio
 from typing import Optional
 
 # We use edge-tts for high-quality, free async text-to-speech
@@ -45,9 +42,7 @@ class AudioGenerationService:
 
 class ImageProvider(str, Enum):
     GEMINI = "gemini"
-    POLLINATIONS = "pollinations"
     STABILITY = "stabilityai"
-    REPLICATE = "replicate"
 
 
 class ImageGenerationService:
@@ -186,32 +181,32 @@ class ImageGenerationService:
     ) -> tuple[str, str]:
         """
         Build a richer educational image prompt and a robust negative prompt.
+        The prompt must stay grounded in the specific concept described.
         """
         style_description = ImageGenerationService._get_style_description(style_preset)
         domain_details = ImageGenerationService._detect_domain_details(prompt)
 
         positive_prompt = (
-            "Create a high-quality educational visual that clearly explains the concept from the scene narration. "
-            "This must be a concept-explaining image, not generic decorative art. "
-            f"Primary concept: {prompt}. "
+            "IMPORTANT: Generate an image that DIRECTLY illustrates the specific concept below. "
+            "Do NOT create generic or decorative art. The image must be relevant to the exact topic described. "
+            f"Primary concept to illustrate: {prompt}. "
             f"{domain_details} "
             "Use a well-structured composition with the main subject centered and clearly visible. "
             "If the concept describes a process, visually show the process step or mechanism. "
-            "If the concept describes internal biology, use cutaway, close-up, or cross-sectional framing where useful. "
-            "Prefer scientifically meaningful details over abstract aesthetics. "
+            "If the concept describes a structure, show the structure with clarity. "
             "Make the image visually intuitive for students and useful in an educational explainer video. "
-            "Add process arrows or flow indicators when needed. "
-            "If labels are visually possible, keep them minimal and clear. "
+            "Add process arrows or flow indicators when relevant to the concept. "
             f"Style direction: {style_description}. "
-            "Image quality requirements: highly detailed, sharp focus, professional educational illustration, "
-            "clean background, strong subject separation, excellent composition, visually explanatory, polished render."
+            "Image quality: highly detailed, sharp focus, professional educational illustration, "
+            "clean background, strong subject separation, excellent composition."
         )
 
         final_negative_prompt = (
-            f"{ImageGenerationService.DEFAULT_NEGATIVE_PROMPT}, {negative_prompt}"
-            if negative_prompt
-            else ImageGenerationService.DEFAULT_NEGATIVE_PROMPT
+            f"{ImageGenerationService.DEFAULT_NEGATIVE_PROMPT}, unrelated subject matter, "
+            f"off-topic visuals, random generic scene"
         )
+        if negative_prompt:
+            final_negative_prompt += f", {negative_prompt}"
 
         logger.info(f"Built enhanced prompt for {provider}: {positive_prompt[:200]}...")
         logger.info(f"Built negative prompt for {provider}: {final_negative_prompt[:160]}...")
@@ -227,25 +222,72 @@ class ImageGenerationService:
         provider: str = ImageProvider.GEMINI.value
     ) -> str:
         """
-        Produce an image from a prompt.
+        Produce an image from a prompt using Gemini or Stability.ai.
         Saves to output_path and returns the path on success.
+        
+        Priority:
+        1. Try specified provider (Gemini or Stability)
+        2. If fails, try the other provider as fallback
+        3. If both fail, raise detailed error
         """
         logger.info(f"Generating image using provider {provider}...")
+        
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-        if provider == ImageProvider.STABILITY.value or provider is None:
-            return await ImageGenerationService.generate_image_with_stability(
-                prompt, output_path, style_preset, negative_prompt
-            )
-        elif provider == ImageProvider.GEMINI.value:
-            return await ImageGenerationService.generate_image_with_gemini(
-                prompt, output_path, style_preset, negative_prompt
-            )
-        elif provider == ImageProvider.POLLINATIONS.value:
-            return await ImageGenerationService._generate_pollinations(
-                prompt, output_path, style_preset, negative_prompt
-            )
-        else:
-            raise NotImplementedError(f"Image provider {provider} is not configured yet.")
+        primary_provider = provider if provider in [ImageProvider.GEMINI.value, ImageProvider.STABILITY.value] else ImageProvider.GEMINI.value
+        fallback_provider = ImageProvider.STABILITY.value if primary_provider == ImageProvider.GEMINI.value else ImageProvider.GEMINI.value
+        
+        primary_error = None
+        fallback_error = None
+        
+        # Try primary provider
+        try:
+            logger.info(f"Attempting image generation with primary provider: {primary_provider}")
+            if primary_provider == ImageProvider.GEMINI.value:
+                return await ImageGenerationService.generate_image_with_gemini(
+                    prompt, output_path, style_preset, negative_prompt
+                )
+            else:
+                return await ImageGenerationService.generate_image_with_stability(
+                    prompt, output_path, style_preset, negative_prompt
+                )
+        except Exception as e:
+            primary_error = str(e)
+            logger.error(f"Primary provider {primary_provider} failed: {primary_error}", exc_info=True)
+        
+        # Try fallback provider
+        try:
+            logger.info(f"Attempting image generation with fallback provider: {fallback_provider}")
+            if fallback_provider == ImageProvider.GEMINI.value:
+                return await ImageGenerationService.generate_image_with_gemini(
+                    prompt, output_path, style_preset, negative_prompt
+                )
+            else:
+                return await ImageGenerationService.generate_image_with_stability(
+                    prompt, output_path, style_preset, negative_prompt
+                )
+        except Exception as e:
+            fallback_error = str(e)
+            logger.error(f"Fallback provider {fallback_provider} failed: {fallback_error}", exc_info=True)
+        
+        # Both providers failed - raise detailed error
+        error_message = (
+            f"Image generation failed with both providers.\n\n"
+            f"Primary Provider ({primary_provider}):\n"
+            f"  Error: {primary_error}\n\n"
+            f"Fallback Provider ({fallback_provider}):\n"
+            f"  Error: {fallback_error}\n\n"
+            f"Please check:\n"
+            f"1. API keys are configured correctly in .env file\n"
+            f"2. API keys have sufficient credits/quota\n"
+            f"3. Network connectivity is working\n"
+            f"4. The prompt is valid and not violating content policies\n\n"
+            f"Prompt: {prompt[:200]}..."
+        )
+        
+        logger.error(error_message)
+        raise RuntimeError(error_message)
 
     @staticmethod
     async def generate_image_with_stability(
@@ -256,12 +298,14 @@ class ImageGenerationService:
     ) -> str:
         """
         Stability.ai Image Generation (Stable Diffusion 3).
+        Raises exception if generation fails.
         """
         api_key = settings.stability_api_key
         if not api_key or api_key == "your_stability_api_key_here":
-            logger.warning("STABILITY_API_KEY missing or placeholder! Falling back to Gemini.")
-            return await ImageGenerationService.generate_image_with_gemini(
-                prompt, output_path, style_preset, negative_prompt
+            raise RuntimeError(
+                "STABILITY_API_KEY is not configured. "
+                "Please add your Stability.ai API key to the .env file. "
+                "Get your API key from: https://platform.stability.ai/account/keys"
             )
 
         final_prompt, final_negative_prompt = ImageGenerationService._build_high_quality_prompt(
@@ -280,15 +324,8 @@ class ImageGenerationService:
             "accept": "image/*"
         }
 
-        data = {
-            "prompt": final_prompt,
-            "negative_prompt": final_negative_prompt,
-            "output_format": "jpeg",
-            "model": "sd3-large-turbo"
-        }
-
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 files = {
                     "prompt": (None, final_prompt),
                     "negative_prompt": (None, final_negative_prompt),
@@ -300,7 +337,7 @@ class ImageGenerationService:
                     url,
                     headers=headers,
                     files=files,
-                    timeout=30.0
+                    timeout=60.0
                 )
                 
                 if response.status_code == 200:
@@ -309,14 +346,28 @@ class ImageGenerationService:
                     logger.info(f"Stability.ai image saved to {output_path}")
                     return output_path
                 else:
-                    logger.error(f"Stability.ai API Error ({response.status_code}): {response.text}")
-                    raise RuntimeError(f"Stability.ai API returned {response.status_code}: {response.text}")
+                    error_text = response.text[:500]
+                    logger.error(f"Stability.ai API Error ({response.status_code}): {error_text}")
+                    raise RuntimeError(
+                        f"Stability.ai API error (HTTP {response.status_code}): {error_text}. "
+                        f"This may indicate insufficient credits, invalid API key, or content policy violation."
+                    )
 
+        except httpx.TimeoutException as e:
+            logger.error(f"Stability.ai request timed out: {e}")
+            raise RuntimeError(
+                f"Stability.ai request timed out after 60 seconds. "
+                f"This may indicate network issues or high API load. "
+                f"Original error: {str(e)}"
+            )
+        except RuntimeError:
+            # Re-raise RuntimeError as-is (already formatted)
+            raise
         except Exception as e:
-            logger.error(f"Stability.ai generation failed: {e}")
-            logger.info("Falling back to Gemini due to Stability.ai failure.")
-            return await ImageGenerationService.generate_image_with_gemini(
-                prompt, output_path, style_preset, negative_prompt
+            logger.error(f"Stability.ai generation failed: {e}", exc_info=True)
+            raise RuntimeError(
+                f"Stability.ai image generation failed: {str(e)}. "
+                f"Please check your API key, network connection, and API status."
             )
 
     @staticmethod
@@ -328,12 +379,14 @@ class ImageGenerationService:
     ) -> str:
         """
         Gemini Imagen image generation.
+        Raises exception if generation fails.
         """
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            logger.warning("GEMINI_API_KEY missing! Falling back to pollinations for safe execution.")
-            return await ImageGenerationService._generate_pollinations(
-                prompt, output_path, style_preset, negative_prompt
+        api_key = os.getenv("GEMINI_API_KEY") or settings.gemini_api_key
+        if not api_key or api_key == "your_gemini_api_key_here":
+            raise RuntimeError(
+                "GEMINI_API_KEY is not configured. "
+                "Please add your Gemini API key to the .env file. "
+                "Get your API key from: https://makersuite.google.com/app/apikey"
             )
 
         final_prompt, final_negative_prompt = ImageGenerationService._build_high_quality_prompt(
@@ -355,6 +408,8 @@ class ImageGenerationService:
             ]
             
             last_error = None
+            error_messages = []
+            
             for model_name in models_to_try:
                 try:
                     logger.info(f"Attempting Gemini Imagen with model: {model_name}")
@@ -373,98 +428,33 @@ class ImageGenerationService:
                             f.write(generated_image.image.image_bytes)
                         logger.info(f"Gemini image ({model_name}) saved to {output_path}")
                         return output_path
+                        
                 except Exception as model_err:
+                    error_msg = f"{model_name}: {str(model_err)}"
+                    error_messages.append(error_msg)
                     logger.warning(f"Gemini model {model_name} failed: {model_err}")
                     last_error = model_err
                     continue
 
-            raise last_error or RuntimeError("Gemini returned success but no images were generated.")
-
-        except Exception as e:
-            logger.error(f"Gemini Imagen generation failed: {e}")
-            logger.info("Falling back to Pollinations due to Gemini failure.")
-            return await ImageGenerationService._generate_pollinations(
-                prompt, output_path, style_preset, negative_prompt
+            # All models failed
+            all_errors = "\n  - ".join(error_messages)
+            raise RuntimeError(
+                f"Gemini Imagen generation failed with all models:\n  - {all_errors}\n\n"
+                f"This may indicate:\n"
+                f"1. Invalid or expired API key\n"
+                f"2. Insufficient quota or credits\n"
+                f"3. Content policy violation\n"
+                f"4. Network connectivity issues\n"
+                f"5. Gemini API service issues"
             )
 
-    @staticmethod
-    async def _generate_pollinations(
-        prompt: str,
-        output_path: str,
-        style_preset: str,
-        negative_prompt: Optional[str]
-    ) -> str:
-        """
-        Pollinations fallback image generation with retries and deep-fallback.
-        """
-        final_prompt, final_negative_prompt = ImageGenerationService._build_high_quality_prompt(
-            prompt=prompt,
-            style_preset=style_preset,
-            negative_prompt=negative_prompt,
-            provider="pollinations"
-        )
-
-        import random
-        import time
-        
-        try:
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    seed = random.randint(1, 1000000)
-                    # Trim prompt for URL safety
-                    display_prompt = final_prompt[:500]
-                    encoded_prompt = urllib.parse.quote(display_prompt)
-                    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=720&nologo=true&seed={seed}"
-                    
-                    if final_negative_prompt:
-                        url += f"&negative={urllib.parse.quote(final_negative_prompt)}"
-
-                    logger.info(f"Pollinations Attempt {attempt+1}: {final_prompt[:80]}...")
-                    
-                    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
-                        async with session.get(url) as response:
-                            if response.status == 200:
-                                image_data = await response.read()
-                                if len(image_data) > 5000: # Ensure it's not a tiny error image
-                                    with open(output_path, "wb") as f:
-                                        f.write(image_data)
-                                    logger.info(f"Pollinations SUCCESS (Attempt {attempt+1})")
-                                    return output_path
-                            
-                            logger.warning(f"Pollinations attempt {attempt+1} got status {response.status}")
-                except Exception as e:
-                    logger.warning(f"Pollinations attempt {attempt+1} failed: {e}")
-                
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(1) # Backoff
-            
-            raise RuntimeError("All Pollinations attempts failed.")
-
+        except RuntimeError:
+            # Re-raise RuntimeError as-is (already formatted)
+            raise
         except Exception as e:
-            logger.warning(f"Primary pollinations image generation failed ({e}). Falling back to a dynamic educational image.")
-            # Use a keyword-based fallback to avoid the "same library photo" issue
-            keywords = ["education", "science", "technology", "learning", "innovation", "biology", "nature"]
-            # Extract a likely good keyword from the prompt if possible
-            prompt_words = [w.lower() for w in prompt.split() if len(w) > 4]
-            search_term = prompt_words[0] if prompt_words else random.choice(keywords)
-            
-            # Use loremflickr with search term and random seed to ensure uniqueness
-            seed = random.randint(1, 1000)
-            fallback_url = f"https://loremflickr.com/1280/720/{search_term}?lock={seed}"
-            
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(fallback_url) as response:
-                        if response.status == 200:
-                            image_data = await response.read()
-                            with open(output_path, "wb") as f:
-                                f.write(image_data)
-                            logger.info(f"Dynamic fallback image ({search_term}) saved to {output_path}")
-                            return output_path
-                        else:
-                            raise RuntimeError(f"Dynamic fallback failed with status {response.status}")
-            except Exception as e2:
-                logger.error(f"Ultra-fallback failed: {e2}")
-                # Create a simple colored placeholder as absolute last resort
-                raise RuntimeError(f"All image generation methods failed for prompt '{prompt}'. Error: {e}")
+            logger.error(f"Gemini Imagen generation failed: {e}", exc_info=True)
+            raise RuntimeError(
+                f"Gemini Imagen generation failed: {str(e)}. "
+                f"Please check your API key, network connection, and API status. "
+                f"Get your API key from: https://makersuite.google.com/app/apikey"
+            )

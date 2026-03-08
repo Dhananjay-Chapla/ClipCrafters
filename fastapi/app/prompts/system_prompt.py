@@ -14,10 +14,10 @@ RULES YOU MUST FOLLOW:
 6. Start with a compelling hook that grabs the viewer's attention in the first 10 seconds.
 7. End with a concise, memorable takeaway.
 8. Adapt complexity to the specified audience and tone.
-9. Suggest specific on-screen visuals for each section when requested.
+9. VISUAL CUES: Each suggested_visuals entry MUST directly describe what to show from that section's narration. Instead of "a robot", suggest "a futuristic robot with neural network connections displayed on its chest panel, interacting with a student at a holographic classroom desk". Reference the specific objects, structures, processes, or concepts mentioned in the narration.
 10. Keep the script within the requested duration (approx. 150 words per minute of narration).
-11. VISUAL CUES: Suggestions must be DESCRIPTIVE and EDUCATIONAL. Instead of "a robot", suggest "a futuristic robot interacting with a student in a classroom".
-12. For abstract concepts, suggest concrete analogies or diagrams.
+11. VISUAL SPECIFICITY: Every suggested_visual must mention at least 2-3 specific nouns/concepts from the section's narration. Generic visuals like "educational animation" or "infographic" are NOT acceptable. Instead, describe WHAT exactly the viewer should see.
+12. For abstract concepts, suggest concrete analogies or diagrams that show the specific idea.
 
 OUTPUT FORMAT — return ONLY valid JSON with this exact structure:
 {

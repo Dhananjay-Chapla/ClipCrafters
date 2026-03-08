@@ -16,6 +16,19 @@ class AssetStatus(str, Enum):
     ERROR = "error"
 
 
+class SceneValidationResult(BaseModel):
+    """Validation result for scene alignment."""
+    scene_id: str
+    is_valid: bool
+    has_script: bool
+    has_image_prompt: bool
+    has_audio: bool
+    has_image: bool
+    prompt_quality_score: float = Field(..., description="0-1 score for prompt specificity")
+    issues: List[str] = Field(default_factory=list, description="List of validation issues")
+    warnings: List[str] = Field(default_factory=list, description="List of warnings")
+
+
 class SceneResponse(BaseModel):
     """Represents a single modular scene in the video pipeline."""
     scene_id: str = Field(..., description="Unique ID for this scene (e.g., project_id_scene_001)")

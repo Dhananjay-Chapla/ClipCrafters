@@ -148,6 +148,51 @@ curl -X DELETE http://localhost:8000/document/{DOCUMENT_ID}
 
 ## How FAISS Indexing Works
 
+## Scene Validation & Quality Assurance
+
+The system includes comprehensive validation to ensure every scene has properly aligned assets:
+
+### Validation Features:
+- **Script Validation**: Ensures narration text is meaningful and sufficient
+- **Image Prompt Quality Scoring**: Validates prompts are specific and concept-grounded (0-1 score)
+- **Asset Alignment Checking**: Verifies narration and image prompts share common concepts
+- **Generic Phrase Detection**: Flags vague prompts that may produce irrelevant images
+- **Asset Status Tracking**: Monitors audio, image, and clip generation status
+
+### Validation Endpoints:
+```bash
+# Validate a single scene
+curl http://localhost:8000/scenes/{scene_id}/validate?project_id={project_id}
+
+# Validate all scenes in a project
+curl http://localhost:8000/projects/{project_id}/validate-all
+```
+
+### Quality Assurance Rules:
+1. **No Generic Fallbacks**: Removed random stock photo fallbacks (loremflickr)
+2. **Concept-Specific Placeholders**: Local placeholders display key concepts from the prompt
+3. **Strict Prompt Validation**: Requires 15+ words and 8+ meaningful content words
+4. **Narration-Grounded Prompts**: All image prompts must reference specific narration content
+5. **Multi-Stage Enrichment**: Visual planner validates and rewrites vague prompts
+
+### Image Generation Priority:
+1. **Primary**: Gemini Imagen (high quality, concept-accurate)
+2. **Fallback**: Stability.ai (if Gemini fails)
+3. **No other fallbacks**: If both fail, a detailed error message is shown
+
+**Important**: Pollinations and local placeholder generation have been removed. Only Gemini and Stability.ai are used for image generation. If both providers fail, the system will show a comprehensive error message with troubleshooting steps.
+
+### 📚 Comprehensive Documentation:
+- **[Scene Generation Guide](SCENE_GENERATION_GUIDE.md)** - Complete workflow and best practices
+- **[Scene Alignment Checklist](SCENE_ALIGNMENT_CHECKLIST.md)** - Quick reference for developers
+- **[Workflow Diagram](WORKFLOW_DIAGRAM.md)** - Visual representation of the pipeline
+- **[Changes Summary](CHANGES_SUMMARY.md)** - Detailed technical changes
+- **[Implementation Summary](IMPLEMENTATION_SUMMARY.md)** - High-level overview
+
+---
+
+## How FAISS Indexing Works
+
 1. Document text is split into overlapping chunks (~512 chars with 64-char overlap).
 2. Each chunk is embedded using **SentenceTransformers** (`all-MiniLM-L6-v2`) into a 384-dim vector, L2-normalised.
 3. Vectors are added to a **FAISS IndexFlatIP** (inner-product = cosine similarity with normalised vectors).

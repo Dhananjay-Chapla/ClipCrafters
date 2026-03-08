@@ -162,24 +162,44 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Virtual Environment
 venv/
 ENV/
 env/
 .venv
+env.bak/
+venv.bak/
 
 # PyCharm
 .idea/
 
 # VS Code
 .vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
 
 # Jupyter Notebook
 .ipynb_checkpoints
 
 # pyenv
 .python-version
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
 # FastAPI / Storage directories
 fastapi/app/storage/uploads/*
@@ -197,6 +217,57 @@ fastapi/app/storage/projects/*
 fastapi/ffmpeg/
 fastapi/temp_ffmpeg/
 
+# Large media files (except samples)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.flv
+*.wmv
+*.webm
+*.m4v
+*.mpg
+*.mpeg
+*.3gp
+*.wav
+*.mp3
+*.flac
+*.aac
+*.ogg
+*.wma
+*.m4a
+!samples/**/*.mp4
+!samples/**/*.mp3
+!demos/**/*.mp4
+!demos/**/*.mp3
+
+# Compressed files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Security / Credentials
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials/
+
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
+*~
