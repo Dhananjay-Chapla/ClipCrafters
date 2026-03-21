@@ -213,7 +213,18 @@ fastapi/app/storage/projects/*
 !fastapi/app/storage/scripts/.gitkeep
 !fastapi/app/storage/projects/.gitkeep
 
-# FFmpeg local installation (downloaded by setup script)
+# FFmpeg local installation and binaries
+# Global rules
+ffmpeg.exe
+ffprobe.exe
+ffplay.exe
+ffmpeg-*-build/
+ffmpeg-*.zip
+ffmpeg-*.7z
+ffmpeg-*.tar.gz
+ffmpeg-*.tar.xz
+
+# Specific location rules
 fastapi/ffmpeg/
 fastapi/ffmpeg-8.0.1-essentials_build/
 fastapi/temp_ffmpeg/
