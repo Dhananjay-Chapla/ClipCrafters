@@ -215,6 +215,7 @@ fastapi/app/storage/projects/*
 
 # FFmpeg local installation (downloaded by setup script)
 fastapi/ffmpeg/
+fastapi/ffmpeg-8.0.1-essentials_build/
 fastapi/temp_ffmpeg/
 
 # Large media files (except samples)

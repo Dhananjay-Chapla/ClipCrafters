@@ -156,6 +156,7 @@ tmp/
 
 # FFmpeg local installation
 ffmpeg/
+ffmpeg-8.0.1-essentials_build/
 temp_ffmpeg/
 
 # Logs
@@ -243,3 +244,5 @@ credentials/
 !samples/**/*.mp3
 !demos/**/*.mp4
 !demos/**/*.mp3
+
+
